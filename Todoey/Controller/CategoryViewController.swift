@@ -7,32 +7,34 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
+
 
 class CategoryViewController: UITableViewController {
 
-    var catArray = [Category]()
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
+    var catArray: Results<Category>?
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         loadCategories()
     }
+    
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        print("Number of Rows \(catArray?.count)")
+        return  catArray?.count ?? 1
+    }
 
       //MARK: - Tableview Datasource Methods
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        let catitem = catArray[indexPath.row]
-        cell.textLabel?.text = catitem.name
-        
+        cell.textLabel?.text = catArray?[indexPath.row].name ?? "No Categories Added"
         //cell.accessoryType = item.done ? .checkmark : .none
         return cell
     }
     
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        //code
-        return  catArray.count
-    }
+
     
         //MARK: - Tableview Delegate Methods
     override func tableView(_ tableView: UITableView, didDeselectRowAt indexPath: IndexPath) {
@@ -40,54 +42,59 @@ class CategoryViewController: UITableViewController {
         
     }
     
+    //seque: UIStoryBoardSeque?
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destinationVC = segue.destination as! TodoListViewController
+        print("Row: \(tableView.indexPathForSelectedRow?.row)")
+        
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationVC.selectedCategory = catArray[indexPath.row]
+            print("Cat Array: \(catArray?[indexPath.row])")
+            destinationVC.selectedCategory = catArray?[indexPath.row]
         }
+   
     }
     
      //MARK: - Data Manipulation Methods
    
-    func saveCategories() {
+    func save(category: Category) {
         do {
-            try self.context.save()
+            // for Core Data use: try self.context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error Saving Context \(error)")
         }
         self.tableView.reloadData()
     }
     
-    func loadCategories(with request: NSFetchRequest<Category> = Category.fetchRequest()){
-        //   let request : NSFetchRequest<Item> = Item.fetchRequest()
-        do {
-            catArray =  try context.fetch(request)
-        } catch {
-            print("Error RetrieveL \(error)")
-        }
+
+    
+    func loadCategories(){
+        catArray = realm.objects(Category.self)
+        tableView.reloadData()
     }
-      //MARK: - Add New Categories 
+
    
+    
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         var textField = UITextField()
         let alert = UIAlertController(title: "Add New Category", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Category", style: .default) { (action) in
         
-            let newCategoryItem = Category(context: self.context)
+            let newCategoryItem = Category()
             newCategoryItem.name = textField.text!
-            self.catArray.append(newCategoryItem)
-            // Use defaults only for small items/configurations, etc
-            // self.defaults.set(self.itemArray, forKey: "TodoListArray")
-            self.saveCategories()
-            self.tableView.reloadData()
+
+            self.save(category: newCategoryItem)
+         //   self.tableView.reloadData()
         }
         
-        alert.addTextField { (alertTextField) in
-            alertTextField.placeholder = "Create New Category"
-            // print(alertTextField)
-            textField = alertTextField
-        }
         alert.addAction(action)
+        
+        alert.addTextField { (field) in
+            textField = field
+            textField.placeholder = "Create New Category"
+        }
         present(alert, animated: true, completion: nil)
         
     }
